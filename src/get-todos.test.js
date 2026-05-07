@@ -37,6 +37,14 @@ test("single done todo element should not return itself", () => {
   expect(result).toStrictEqual(todos);
 });
 
+test("forwarded checkbox marker is not treated as an unfinished todo", () => {
+  const lines = ["- [>] Already forwarded", "- [ ] Still open"];
+
+  const result = getTodos({ lines });
+
+  expect(result).toStrictEqual(["- [ ] Still open"]);
+});
+
 test("single canceled todo element should not return itself", () => {
   // GIVEN
   const lines = ["- [-] tada"];

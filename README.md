@@ -28,6 +28,14 @@ Use **Rollover todos from all previous daily notes** (command palette) to collec
 
 Your **Previous day todo behavior** setting applies to each source note that contributed todos: duplicate keeps sources unchanged; delete removes contributed lines from those notes; forward rewrites each contributing note’s parent lines as `[>]` with backlinks.
 
+### 4. Command: Move completed todos to bottom of section (current heading)
+
+Open your **daily note**, place the cursor anywhere inside the section you care about (under an ATX heading such as `## PXC`), then run **Move completed todos to bottom of section (current heading)** from the command palette.
+
+The plugin finds the nearest heading **above the cursor**, takes everything until the next heading of the same or higher level, and **reorders only within that section**: lines that are completed todos (per **Done status markers**) move after all incomplete todos and other lines (paragraphs, bullets without checkboxes, etc.) in that section. Nested lines under a completed todo move with it when **Roll over children of todos** is enabled.
+
+Completed todos are placed **directly** after the preceding lines in that section—no extra blank line is added between list items. For example, open tasks stay flush above completed ones unless your note already contained blank lines there.
+
 ## Requirements
 
 - [ ] You must have either:
@@ -57,7 +65,7 @@ You can choose one of three behaviors:
 
 - `Duplicate (default)`: Keep yesterday's todos and copy them into today.
 - `Delete`: Remove rolled todos from the previous day after they are added to today's note. This is destructive.
-- `Mark todos as forwarded`: Keep the previous day line, convert `- [ ]` to `- [>]`, and append ` (forwarded to [[today-note]])`. The copied line on today's note gets ` (forwarded from [[previous-note]])`.
+- `Mark todos as forwarded`: Only applies to **open** tasks whose checkbox is a single space: `- [ ]` (same for `*`/`+` list markers). Other incomplete markers (for example `- [/]` from Tasks) are not forwarded; neither are lines already marked `- [>]`. The plugin turns eligible lines into `- [>]`, appends ` (forwarded to [[today-note]])`, and adds ` (forwarded from [[previous-note]])` on today's copy.
 
 If you use the `Undo last rollover` command, both note files are restored to their pre-rollover state (within the 2-minute undo window).
 
@@ -73,7 +81,7 @@ By default, only the actual todos are rolled over. If you add nested Markdown el
 
 By default, the plugin considers checkboxes containing 'x', 'X', or '-' as completed tasks that won't be rolled over. You can customize this by adding any characters that should be considered "done" markers. For example, adding '?+>' would also treat checkboxes like '[?]', '[+]', and '[>]' as completed tasks. This is useful for users of custom status markers like the [Obsidian Tasks](https://publish.obsidian.md/tasks/Introduction) plugin.
 
-If you use `Mark todos as forwarded`, add `>` to done status markers so forwarded tasks (`[>]`) are not rolled over again.
+Tasks already marked forwarded (`- [>]`) are never treated as unfinished todos, so they are not rolled again.
 
 The plugin supports Unicode characters, including complex emoji and grapheme clusters, in checkbox content. This means you can use emojis or special Unicode characters as status markers and they will be handled correctly.
 

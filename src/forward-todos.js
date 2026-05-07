@@ -1,6 +1,11 @@
 const TODO_CHECKBOX_PATTERN = /^(\s*[*+-]\s)\[(.+?)\]/u;
 
+/** Parent must be an open task `- [ ]` (single space); other incomplete markers are not forwarded. */
+const OPEN_CHECKBOX_LINE = /^\s*[*+-]\s\[ \]/u;
+
 const getIndentation = (line) => (line.match(/^\s*/) || [""])[0].length;
+
+export const isOpenCheckboxTodoLine = (line) => OPEN_CHECKBOX_LINE.test(line);
 
 export const groupTodoBlocks = (todos) => {
   const groups = [];
@@ -53,6 +58,9 @@ export const buildForwardTodoData = ({
 
   todoBlocks.forEach((block) => {
     const [parentTodo, ...childTodos] = block;
+    if (!isOpenCheckboxTodoLine(parentTodo)) {
+      return;
+    }
     const annotatedTodo = annotateDestinationTodoLine(parentTodo, sourceDailyNote);
     todosForToday.push(annotatedTodo, ...childTodos);
     sourceReplacements.push({

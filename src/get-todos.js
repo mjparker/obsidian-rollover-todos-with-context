@@ -1,3 +1,36 @@
+const GRAPHENE_MODIFIERS = ["\u202E", "\u200B", "\u200C", "\u200D"];
+
+/** Split string into grapheme clusters (same rules as TodoParser). */
+export function segmentGraphemes(content, contentType = "content") {
+  if (typeof Intl !== "undefined" && Intl.Segmenter) {
+    const segmenter = new Intl.Segmenter("en", { granularity: "grapheme" });
+    return Array.from(segmenter.segment(content), (s) => s.segment);
+  }
+  console.error(
+    `Intl.Segmenter not available, falling back to Array.from() for ${contentType}`
+  );
+  return Array.from(content);
+}
+
+/**
+ * Checkbox line classification for list tooling (move completed, etc.).
+ * @returns {null | 'incomplete' | 'completed'} null if not a valid single-grapheme checkbox todo
+ */
+export function getCheckboxTodoStatus(line, doneStatusMarkers = "xX-") {
+  const match = line.match(/\s*[*+-] \[(.+?)\]/);
+  if (!match) return null;
+
+  const contentChars = segmentGraphemes(match[1], "checkbox content");
+  if (contentChars.length !== 1) return null;
+
+  const singleChar = contentChars[0];
+  if (GRAPHENE_MODIFIERS.some((c) => c === singleChar)) return null;
+  if (singleChar === ">") return null;
+
+  const markerChars = segmentGraphemes(doneStatusMarkers, "done status markers");
+  return markerChars.includes(singleChar) ? "completed" : "incomplete";
+}
+
 class TodoParser {
   // Support all unordered list bullet symbols as per spec (https://daringfireball.net/projects/markdown/syntax#list)
   bulletSymbols = ["-", "*", "+"];
@@ -13,20 +46,7 @@ class TodoParser {
 
   // Parse content with segmentation to allow for Unicode grapheme clusters
   #parseIntoChars(content, contentType = "content") {
-    // Use Intl.Segmenter to properly split grapheme clusters if available,
-    // otherwise fall back to Array.from. The fallback should not trigger in
-    // Obsidian since it uses Electron which supports Intl.Segmenter.
-    if (typeof Intl !== "undefined" && Intl.Segmenter) {
-      const segmenter = new Intl.Segmenter("en", { granularity: "grapheme" });
-      return Array.from(segmenter.segment(content), (s) => s.segment);
-    } else {
-      // Array.from() splits surrogate pairs correctly but not complex grapheme clusters
-      // (e.g., 👨‍👩‍👧‍👦 would be split incorrectly) and fail to match.
-      console.error(
-        `Intl.Segmenter not available, falling back to Array.from() for ${contentType}`
-      );
-      return Array.from(content);
-    }
+    return segmentGraphemes(content, contentType);
   }
 
   constructor(lines, withChildren, doneStatusMarkers) {
@@ -61,10 +81,14 @@ class TodoParser {
 
     const singleChar = contentChars[0];
 
+    // Already forwarded by this plugin; never roll again
+    if (singleChar === ">") {
+      return false;
+    }
+
     // Exclude grapheme modifiers that are not valid as standalone content
-    const graphemeModifiers = ['\u202E', '\u200B', '\u200C', '\u200D'];
     const hasGraphemeModifier = contentChars.some((char) =>
-      graphemeModifiers.includes(char)
+      GRAPHENE_MODIFIERS.includes(char)
     );
     if (hasGraphemeModifier) {
       return false;

@@ -1,4 +1,4 @@
-import { Notice, Plugin } from "obsidian";
+import { MarkdownView, Notice, Plugin } from "obsidian";
 import {
   getDailyNoteSettings,
   getAllDailyNotes,
@@ -8,6 +8,11 @@ import UndoModal from "./ui/UndoModal";
 import RolloverSettingTab from "./ui/RolloverSettingTab";
 import { getTodos } from "./get-todos";
 import { buildForwardTodoData, groupTodoBlocks } from "./forward-todos";
+import {
+  findContainingHeading,
+  findSectionEndExclusive,
+  moveCompletedTodoBlocksToBottom,
+} from "./move-completed-todos";
 
 const MAX_TIME_SINCE_CREATION = 5000; // 5 seconds
 
@@ -193,6 +198,73 @@ export default class RolloverTodosPlugin extends Plugin {
     }
   }
 
+  isDailyNoteFile(file) {
+    const { moment } = window;
+    let { folder, format } = getDailyNoteSettings();
+    folder = this.getCleanFolder(folder);
+    const prefix = folder === "" ? "" : folder + "/";
+    if (folder !== "" && !file.path.startsWith(prefix)) {
+      return false;
+    }
+    return moment(file.basename, format, true).isValid();
+  }
+
+  async moveCompletedTodosInCurrentHeading() {
+    const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+    if (!view || !view.file) {
+      new Notice("Open a note in the editor first.", 4000);
+      return;
+    }
+
+    const file = view.file;
+    if (!this.isDailyNoteFile(file)) {
+      new Notice("Active file is not in your daily notes folder/format.", 6000);
+      return;
+    }
+
+    const editor = view.editor;
+    const cursorLine = editor.getCursor().line;
+    const content = await this.app.vault.read(file);
+    const lines = content.split(/\r?\n|\r|\n/g);
+
+    const headingCtx = findContainingHeading(lines, cursorLine);
+    if (!headingCtx) {
+      new Notice("No heading found above the cursor.", 5000);
+      return;
+    }
+
+    const { headingLine, headingLevel } = headingCtx;
+    const sectionEndExclusive = findSectionEndExclusive(
+      lines,
+      headingLine,
+      headingLevel
+    );
+
+    const bodyLines = lines.slice(headingLine + 1, sectionEndExclusive);
+    const newBodyLines = moveCompletedTodoBlocksToBottom(bodyLines, {
+      doneStatusMarkers: this.settings.doneStatusMarkers || "xX-",
+      rolloverChildren: !!this.settings.rolloverChildren,
+    });
+
+    const unchanged =
+      bodyLines.length === newBodyLines.length &&
+      bodyLines.every((line, i) => line === newBodyLines[i]);
+
+    if (unchanged) {
+      new Notice("No completed todos to move in this section.", 4500);
+      return;
+    }
+
+    const newContent = [
+      ...lines.slice(0, headingLine + 1),
+      ...newBodyLines,
+      ...lines.slice(sectionEndExclusive),
+    ].join("\n");
+
+    await this.app.vault.modify(file, newContent);
+    new Notice("Moved completed todos to the bottom of this section.", 4500);
+  }
+
   getCleanFolder(folder) {
     // Check if user defined folder with root `/` e.g. `/dailies`
     if (folder.startsWith("/")) {
@@ -310,6 +382,15 @@ export default class RolloverTodosPlugin extends Plugin {
         });
         todos_today_for_note = forwardTodoData.todosForToday;
         sourceReplacements = forwardTodoData.sourceReplacements;
+        todosAdded = todos_today_for_note.length;
+      }
+
+      if (previousDayBehavior === "forward" && todos_today_for_note.length === 0) {
+        new Notice(
+          "Rollover: nothing to forward—only open `- [ ]` tasks are forwarded.",
+          8000
+        );
+        return;
       }
 
       // get today's content and modify it
@@ -556,8 +637,17 @@ export default class RolloverTodosPlugin extends Plugin {
           replacementsByFile.set(srcFile, []);
         replacementsByFile.get(srcFile).push(...forwardTodoData.sourceReplacements);
       }
+      todosAdded = todos_today_for_note.length;
     } else {
       todos_today_for_note = orderedContributions.flatMap(({ block }) => block);
+    }
+
+    if (previousDayBehavior === "forward" && todos_today_for_note.length === 0) {
+      new Notice(
+        "Rollover: nothing to forward—only open `- [ ]` tasks are forwarded.",
+        8000
+      );
+      return;
     }
 
     let undoHistoryInstance = {
@@ -724,6 +814,14 @@ export default class RolloverTodosPlugin extends Plugin {
       name: "Rollover todos from all previous daily notes",
       callback: () => {
         this.rolloverFromAllPreviousDailyNotes();
+      },
+    });
+
+    this.addCommand({
+      id: "obsidian-rollover-daily-todos-move-completed-in-heading",
+      name: "Move completed todos to bottom of section (current heading)",
+      callback: () => {
+        this.moveCompletedTodosInCurrentHeading();
       },
     });
 

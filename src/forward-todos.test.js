@@ -3,6 +3,7 @@ import {
   annotateDestinationTodoLine,
   buildForwardTodoData,
   groupTodoBlocks,
+  isOpenCheckboxTodoLine,
   transformSourceTodoLine,
 } from "./forward-todos";
 
@@ -39,6 +40,34 @@ test("transformSourceTodoLine converts status and appends destination backlink",
   const result = transformSourceTodoLine(todoLine, "2026-05-07");
 
   expect(result).toBe("  * [>] Review PR (forwarded to [[2026-05-07]])");
+});
+
+test("buildForwardTodoData only forwards open `- [ ]` parents", () => {
+  const todos = ["- [/] Tasks-style open", "- [ ] Plain open"];
+
+  const result = buildForwardTodoData({
+    todos,
+    sourceDailyNote: "2026-05-06",
+    destinationDailyNote: "2026-05-07",
+  });
+
+  expect(result.todosForToday).toStrictEqual([
+    "- [ ] Plain open (forwarded from [[2026-05-06]])",
+  ]);
+  expect(result.sourceReplacements).toStrictEqual([
+    {
+      from: "- [ ] Plain open",
+      to: "- [>] Plain open (forwarded to [[2026-05-07]])",
+    },
+  ]);
+});
+
+test("isOpenCheckboxTodoLine accepts list markers and rejects forwarded marker", () => {
+  expect(isOpenCheckboxTodoLine("- [ ] ok")).toBe(true);
+  expect(isOpenCheckboxTodoLine("* [ ] ok")).toBe(true);
+  expect(isOpenCheckboxTodoLine("  + [ ] ok")).toBe(true);
+  expect(isOpenCheckboxTodoLine("- [/] no")).toBe(false);
+  expect(isOpenCheckboxTodoLine("- [>] no")).toBe(false);
 });
 
 test("buildForwardTodoData annotates only parent lines and prepares replacements", () => {
