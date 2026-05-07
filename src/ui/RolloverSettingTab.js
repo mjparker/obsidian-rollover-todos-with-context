@@ -53,15 +53,20 @@ export default class RolloverSettingTab extends PluginSettingTab {
       );
 
     new Setting(this.containerEl)
-      .setName("Delete todos from previous day")
+      .setName("Previous day todo behavior")
       .setDesc(
-        `Once todos are found, they are added to Today's Daily Note. If successful, they are deleted from Yesterday's Daily note. Enabling this is destructive and may result in lost data. Keeping this disabled will simply duplicate them from yesterday's note and place them in the appropriate section. Note that currently, duplicate todos will be deleted regardless of what heading they are in, and which heading you choose from above.`
+        `Choose how rolled todos affect the previous daily note: keep duplicates, delete source todos, or mark source todos as forwarded with backlinks.`
       )
-      .addToggle((toggle) =>
-        toggle
-          .setValue(this.plugin.settings.deleteOnComplete || false)
+      .addDropdown((dropdown) =>
+        dropdown
+          .addOptions({
+            duplicate: "Duplicate (keep previous day todos)",
+            delete: "Delete todos from previous day",
+            forward: "Mark todos as forwarded",
+          })
+          .setValue(this.plugin.settings.previousDayBehavior || "duplicate")
           .onChange((value) => {
-            this.plugin.settings.deleteOnComplete = value;
+            this.plugin.settings.previousDayBehavior = value;
             this.plugin.saveSettings();
           })
       );

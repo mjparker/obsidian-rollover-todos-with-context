@@ -41,11 +41,17 @@ If you chose a template file to use for new daily notes in `Daily notes > Settin
 
 If you leave this field as blank, or select `None`, then incomplete todos will be rolled onto the end of today's note (for new notes with no template, the end is the beginning of the note).
 
-### 3. Delete todos from previous day
+### 3. Previous day todo behavior
 
-By default, this plugin will actually make a copy of incomplete todos. So if you forgot to wash your dog yesterday, and didn't check it off, then you will have an incomplete checkmark on yesterday's daily note, and a new incomplete checkmark will be rolled into today's daily note. If you use the `Undo last rollover` command, deleted todos will be restored (remember, the `time limit on this is 2 minutes`).
+By default, this plugin duplicates incomplete todos. That means the unfinished task stays on yesterday's daily note and a copy is added to today's note.
 
-Toggling this setting on will remove incomplete todos from the previous daily note once today's daily note has a copy of them.
+You can choose one of three behaviors:
+
+- `Duplicate (default)`: Keep yesterday's todos and copy them into today.
+- `Delete`: Remove rolled todos from the previous day after they are added to today's note. This is destructive.
+- `Mark todos as forwarded`: Keep the previous day line, convert `- [ ]` to `- [>]`, and append ` (forwarded to [[today-note]])`. The copied line on today's note gets ` (forwarded from [[previous-note]])`.
+
+If you use the `Undo last rollover` command, both note files are restored to their pre-rollover state (within the 2-minute undo window).
 
 ### 4. Remove empty todos in rollover
 
@@ -58,6 +64,8 @@ By default, only the actual todos are rolled over. If you add nested Markdown el
 ### 6. Done status markers
 
 By default, the plugin considers checkboxes containing 'x', 'X', or '-' as completed tasks that won't be rolled over. You can customize this by adding any characters that should be considered "done" markers. For example, adding '?+>' would also treat checkboxes like '[?]', '[+]', and '[>]' as completed tasks. This is useful for users of custom status markers like the [Obsidian Tasks](https://publish.obsidian.md/tasks/Introduction) plugin.
+
+If you use `Mark todos as forwarded`, add `>` to done status markers so forwarded tasks (`[>]`) are not rolled over again.
 
 The plugin supports Unicode characters, including complex emoji and grapheme clusters, in checkbox content. This means you can use emojis or special Unicode characters as status markers and they will be handled correctly.
 

@@ -7,6 +7,7 @@ import {
 import UndoModal from "./ui/UndoModal";
 import RolloverSettingTab from "./ui/RolloverSettingTab";
 import { getTodos } from "./get-todos";
+import { buildForwardTodoData } from "./forward-todos";
 
 const MAX_TIME_SINCE_CREATION = 5000; // 5 seconds
 
@@ -42,14 +43,25 @@ export default class RolloverTodosPlugin extends Plugin {
   async loadSettings() {
     const DEFAULT_SETTINGS = {
       templateHeading: "none",
-      deleteOnComplete: false,
+      previousDayBehavior: "duplicate",
       removeEmptyTodos: false,
       rolloverChildren: false,
       rolloverOnFileCreate: true,
       doneStatusMarkers: "xX-",
       leadingNewLine: true,
     };
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    const loadedSettings = await this.loadData();
+    this.settings = Object.assign({}, DEFAULT_SETTINGS, loadedSettings);
+
+    if (!this.settings.previousDayBehavior) {
+      this.settings.previousDayBehavior = this.settings.deleteOnComplete
+        ? "delete"
+        : "duplicate";
+    }
+
+    if (!["duplicate", "delete", "forward"].includes(this.settings.previousDayBehavior)) {
+      this.settings.previousDayBehavior = "duplicate";
+    }
   }
 
   async saveSettings() {
@@ -198,7 +210,12 @@ export default class RolloverTodosPlugin extends Plugin {
         10000
       );
     } else {
-      const { templateHeading, deleteOnComplete, removeEmptyTodos, leadingNewLine } =
+      const {
+        templateHeading,
+        previousDayBehavior,
+        removeEmptyTodos,
+        leadingNewLine,
+      } =
         this.settings;
 
       // check if there is a daily note from yesterday
@@ -249,17 +266,29 @@ export default class RolloverTodosPlugin extends Plugin {
         todosAdded = todos_yesterday.length;
       }
 
+      let todos_today_for_note = todos_today;
+      let sourceReplacements = [];
+      if (previousDayBehavior === "forward") {
+        const forwardTodoData = buildForwardTodoData({
+          todos: todos_today,
+          sourceDailyNote: lastDailyNote.basename,
+          destinationDailyNote: file.basename,
+        });
+        todos_today_for_note = forwardTodoData.todosForToday;
+        sourceReplacements = forwardTodoData.sourceReplacements;
+      }
+
       // get today's content and modify it
       let templateHeadingNotFoundMessage = "";
       const templateHeadingSelected = templateHeading !== "none";
 
-      if (todos_today.length > 0) {
+      if (todos_today_for_note.length > 0) {
         let dailyNoteContent = await this.app.vault.read(file);
         undoHistoryInstance.today = {
           file: file,
           oldContent: `${dailyNoteContent}`,
         };
-        const todos_todayString = `\n${todos_today.join("\n")}`;
+        const todos_todayString = `\n${todos_today_for_note.join("\n")}`;
 
         // If template heading is selected, try to rollover to template heading
         if (templateHeadingSelected) {
@@ -285,8 +314,8 @@ export default class RolloverTodosPlugin extends Plugin {
         await this.app.vault.modify(file, dailyNoteContent);
       }
 
-      // if deleteOnComplete, get yesterday's content and modify it
-      if (deleteOnComplete) {
+      // If delete behavior is selected, remove rolled todos from the previous note.
+      if (previousDayBehavior === "delete") {
         let lastDailyNoteContent = await this.app.vault.read(lastDailyNote);
         undoHistoryInstance.previousDay = {
           file: lastDailyNote,
@@ -304,6 +333,40 @@ export default class RolloverTodosPlugin extends Plugin {
         await this.app.vault.modify(lastDailyNote, modifiedContent);
       }
 
+      // If forward behavior is selected, mark rolled todos as forwarded in the previous note.
+      if (previousDayBehavior === "forward" && sourceReplacements.length > 0) {
+        let lastDailyNoteContent = await this.app.vault.read(lastDailyNote);
+        undoHistoryInstance.previousDay = {
+          file: lastDailyNote,
+          oldContent: `${lastDailyNoteContent}`,
+        };
+
+        const lastDailyNoteLines = lastDailyNoteContent.split("\n");
+        let searchStart = 0;
+
+        sourceReplacements.forEach((replacement) => {
+          let lineToReplaceIndex = lastDailyNoteLines.findIndex(
+            (line, index) => index >= searchStart && line === replacement.from
+          );
+
+          if (lineToReplaceIndex === -1) {
+            lineToReplaceIndex = lastDailyNoteLines.findIndex(
+              (line) => line === replacement.from
+            );
+          }
+
+          if (lineToReplaceIndex === -1) {
+            return;
+          }
+
+          lastDailyNoteLines[lineToReplaceIndex] = replacement.to;
+          searchStart = lineToReplaceIndex + 1;
+        });
+
+        const modifiedContent = lastDailyNoteLines.join("\n");
+        await this.app.vault.modify(lastDailyNote, modifiedContent);
+      }
+
       // Let user know rollover has been successful with X todos
       const todosAddedString =
         todosAdded == 0
@@ -312,7 +375,7 @@ export default class RolloverTodosPlugin extends Plugin {
       const emptiesToNotAddToTomorrowString =
         emptiesToNotAddToTomorrow == 0
           ? ""
-          : deleteOnComplete
+          : previousDayBehavior === "delete"
           ? `- ${emptiesToNotAddToTomorrow} empty todo${
               emptiesToNotAddToTomorrow > 1 ? "s" : ""
             } removed.`
