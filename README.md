@@ -100,4 +100,36 @@ And the previous day might look like
 
 ## Installation
 
-This plugin can be installed within the `Third-party Plugins` tab within Obsidian
+### Manual install (from this repository)
+
+Use this when you are developing locally or installing from a Git clone instead of the Community Plugins browser.
+
+1. **Clone or download** this repo and open a terminal in the project root.
+
+2. **Install dependencies and build** the bundled plugin entrypoint:
+
+   ```bash
+   npm install
+   npm run build
+   ```
+
+   This generates **`main.js`** in the project root (alongside `manifest.json`).
+
+3. **Copy the plugin into your vault.** Obsidian loads plugins from the hidden `.obsidian` folder inside each vault. Create a folder named after the plugin id (see `manifest.json`, `"id": "obsidian-rollover-daily-todos"`):
+
+   ```text
+   <YourVault>/.obsidian/plugins/obsidian-rollover-daily-todos/
+   ```
+
+   Copy at least these files into that folder:
+
+   - `manifest.json`
+   - `main.js`
+
+4. **Enable the plugin** in Obsidian: **Settings → Community plugins** → turn off Restricted mode if prompted → find **Rollover Daily Todos** and enable it. Restart Obsidian if it does not appear.
+
+**Development tip:** To avoid copying after every change, symlink your repo into that plugins path (same folder name as above), then run `npm run build` after edits and reload the plugin or restart Obsidian.
+
+### Community Plugins
+
+You can also install released versions from Obsidian’s **Community Plugins** tab when this plugin is listed there (search for **Rollover Daily Todos**).
