@@ -8,11 +8,7 @@ import UndoModal from "./ui/UndoModal";
 import RolloverSettingTab from "./ui/RolloverSettingTab";
 import { getTodos } from "./get-todos";
 import { buildForwardTodoData, groupTodoBlocks } from "./forward-todos";
-import {
-  findContainingHeading,
-  findSectionEndExclusive,
-  moveCompletedTodoBlocksToBottom,
-} from "./move-completed-todos";
+import { applyMoveCompletedToAllSections } from "./move-completed-todos";
 
 const MAX_TIME_SINCE_CREATION = 5000; // 5 seconds
 
@@ -209,7 +205,7 @@ export default class RolloverTodosPlugin extends Plugin {
     return moment(file.basename, format, true).isValid();
   }
 
-  async moveCompletedTodosInCurrentHeading() {
+  async moveCompletedTodosInDailyNote() {
     const view = this.app.workspace.getActiveViewOfType(MarkdownView);
     if (!view || !view.file) {
       new Notice("Open a note in the editor first.", 4000);
@@ -222,47 +218,35 @@ export default class RolloverTodosPlugin extends Plugin {
       return;
     }
 
-    const editor = view.editor;
-    const cursorLine = editor.getCursor().line;
     const content = await this.app.vault.read(file);
     const lines = content.split(/\r?\n|\r|\n/g);
+    const endsWithNewline = /\r?\n$/.test(content);
 
-    const headingCtx = findContainingHeading(lines, cursorLine);
-    if (!headingCtx) {
-      new Notice("No heading found above the cursor.", 5000);
-      return;
-    }
-
-    const { headingLine, headingLevel } = headingCtx;
-    const sectionEndExclusive = findSectionEndExclusive(
-      lines,
-      headingLine,
-      headingLevel
-    );
-
-    const bodyLines = lines.slice(headingLine + 1, sectionEndExclusive);
-    const newBodyLines = moveCompletedTodoBlocksToBottom(bodyLines, {
+    const settings = {
       doneStatusMarkers: this.settings.doneStatusMarkers || "xX-",
       rolloverChildren: !!this.settings.rolloverChildren,
-    });
+    };
 
-    const unchanged =
-      bodyLines.length === newBodyLines.length &&
-      bodyLines.every((line, i) => line === newBodyLines[i]);
+    const { lines: newLines, changed } = applyMoveCompletedToAllSections(
+      lines,
+      settings
+    );
 
-    if (unchanged) {
-      new Notice("No completed todos to move in this section.", 4500);
+    if (!changed) {
+      new Notice("No completed todos to move.", 4500);
       return;
     }
 
-    const newContent = [
-      ...lines.slice(0, headingLine + 1),
-      ...newBodyLines,
-      ...lines.slice(sectionEndExclusive),
-    ].join("\n");
+    let out = newLines.join("\n");
+    if (endsWithNewline && !out.endsWith("\n")) {
+      out += "\n";
+    }
 
-    await this.app.vault.modify(file, newContent);
-    new Notice("Moved completed todos to the bottom of this section.", 4500);
+    await this.app.vault.modify(file, out);
+    new Notice(
+      "Moved completed todos to the bottom of each section in this note.",
+      5000
+    );
   }
 
   getCleanFolder(folder) {
@@ -819,9 +803,9 @@ export default class RolloverTodosPlugin extends Plugin {
 
     this.addCommand({
       id: "obsidian-rollover-daily-todos-move-completed-in-heading",
-      name: "Move completed todos to bottom of section (current heading)",
+      name: "Move completed todos to bottom of each section",
       callback: () => {
-        this.moveCompletedTodosInCurrentHeading();
+        this.moveCompletedTodosInDailyNote();
       },
     });
 

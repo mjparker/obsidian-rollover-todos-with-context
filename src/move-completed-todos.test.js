@@ -1,8 +1,11 @@
 import { expect, test } from "vitest";
 import {
+  applyMoveCompletedToAllSections,
   findContainingHeading,
   findSectionEndExclusive,
   moveCompletedTodoBlocksToBottom,
+  removeBlankLinesBetweenAdjacentCheckboxLines,
+  trimLeadingEmptyLines,
 } from "./move-completed-todos";
 
 test("findContainingHeading finds nearest heading above cursor", () => {
@@ -31,6 +34,45 @@ test("findSectionEndExclusive stops at sibling or higher heading", () => {
 
   expect(findSectionEndExclusive(lines, 0, 2)).toBe(2);
   expect(findSectionEndExclusive(lines, 3, 3)).toBe(5);
+});
+
+test("removeBlankLinesBetweenAdjacentCheckboxLines removes blank between two todos", () => {
+  expect(
+    removeBlankLinesBetweenAdjacentCheckboxLines(
+      ["- [ ] a", "", "- [x] b"],
+      "xX-"
+    )
+  ).toStrictEqual(["- [ ] a", "- [x] b"]);
+});
+
+test("trimLeadingEmptyLines removes blank lines before first content", () => {
+  expect(trimLeadingEmptyLines(["", "", "x"])).toStrictEqual(["x"]);
+});
+
+test("applyMoveCompletedToAllSections updates every heading section", () => {
+  const lines = [
+    "## A",
+    "- [x] done a",
+    "- [ ] open a",
+    "## B",
+    "- [ ] open b",
+    "- [x] done b",
+  ];
+
+  const { lines: out, changed } = applyMoveCompletedToAllSections(lines, {
+    doneStatusMarkers: "xX-",
+    rolloverChildren: false,
+  });
+
+  expect(changed).toBe(true);
+  expect(out).toStrictEqual([
+    "## A",
+    "- [ ] open a",
+    "- [x] done a",
+    "## B",
+    "- [ ] open b",
+    "- [x] done b",
+  ]);
 });
 
 test("RCC example: completed todo sits directly under open todo with no blank line between", () => {

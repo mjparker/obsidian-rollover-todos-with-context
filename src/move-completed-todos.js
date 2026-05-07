@@ -1,5 +1,91 @@
 import { getCheckboxTodoStatus } from "./get-todos";
 
+/** Drop blank lines that only sit between two checkbox todo lines (keeps list flush). */
+export const removeBlankLinesBetweenAdjacentCheckboxLines = (
+  lines,
+  doneStatusMarkers
+) => {
+  const out = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (
+      lines[i] === "" &&
+      i > 0 &&
+      i < lines.length - 1 &&
+      getCheckboxTodoStatus(lines[i - 1], doneStatusMarkers) !== null &&
+      getCheckboxTodoStatus(lines[i + 1], doneStatusMarkers) !== null
+    ) {
+      continue;
+    }
+    out.push(lines[i]);
+  }
+  return out;
+};
+
+export const trimLeadingEmptyLines = (lines) => {
+  let start = 0;
+  while (start < lines.length && lines[start] === "") {
+    start++;
+  }
+  return lines.slice(start);
+};
+
+/**
+ * Walk all ATX headings (deepest first, then bottom-up) and reorder completed
+ * todos within each section until no section changes.
+ */
+export const applyMoveCompletedToAllSections = (lines, settings) => {
+  const markers = settings.doneStatusMarkers || "xX-";
+  let working = lines.slice();
+  let anyChanged = false;
+  let guard = 0;
+
+  while (guard++ < 100) {
+    const headings = [];
+    for (let i = 0; i < working.length; i++) {
+      const m = working[i].match(/^(#{1,6})\s/);
+      if (m) {
+        headings.push({ line: i, level: m[1].length });
+      }
+    }
+    if (headings.length === 0) {
+      break;
+    }
+
+    headings.sort((a, b) => {
+      if (b.level !== a.level) {
+        return b.level - a.level;
+      }
+      return b.line - a.line;
+    });
+
+    let passChanged = false;
+    for (const h of headings) {
+      const end = findSectionEndExclusive(working, h.line, h.level);
+      const body = working.slice(h.line + 1, end);
+      let newBody = moveCompletedTodoBlocksToBottom(body, settings);
+      newBody = removeBlankLinesBetweenAdjacentCheckboxLines(newBody, markers);
+      newBody = trimLeadingEmptyLines(newBody);
+
+      const unchanged =
+        body.length === newBody.length &&
+        body.every((line, i) => line === newBody[i]);
+
+      if (!unchanged) {
+        working.splice(h.line + 1, end - h.line - 1, ...newBody);
+        anyChanged = true;
+        passChanged = true;
+        break;
+      }
+    }
+
+    if (!passChanged) {
+      break;
+    }
+  }
+
+  return { lines: working, changed: anyChanged };
+};
+
 export const getLeadingWhitespaceLength = (line) =>
   (line.match(/^\s*/) || [""])[0].length;
 

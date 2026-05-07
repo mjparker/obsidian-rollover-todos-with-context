@@ -28,13 +28,13 @@ Use **Rollover todos from all previous daily notes** (command palette) to collec
 
 Your **Previous day todo behavior** setting applies to each source note that contributed todos: duplicate keeps sources unchanged; delete removes contributed lines from those notes; forward rewrites each contributing note’s parent lines as `[>]` with backlinks.
 
-### 4. Command: Move completed todos to bottom of section (current heading)
+### 4. Command: Move completed todos to bottom of each section
 
-Open your **daily note**, place the cursor anywhere inside the section you care about (under an ATX heading such as `## PXC`), then run **Move completed todos to bottom of section (current heading)** from the command palette.
+With your **daily note** open in the editor, run **Move completed todos to bottom of each section** from the command palette.
 
-The plugin finds the nearest heading **above the cursor**, takes everything until the next heading of the same or higher level, and **reorders only within that section**: lines that are completed todos (per **Done status markers**) move after all incomplete todos and other lines (paragraphs, bullets without checkboxes, etc.) in that section. Nested lines under a completed todo move with it when **Roll over children of todos** is enabled.
+The plugin walks **every ATX heading** (`#` … `######`) in the file. Under each heading, it takes lines until the next heading of the **same or higher** level, and moves completed checkbox tasks (per **Done status markers**) to the **bottom of that section**, below incomplete todos and other lines (paragraphs, bullets without checkboxes, nested headings as plain lines, etc.). Deeper headings (`###` inside `##`) are handled **first**, then outer sections, so nested lists stay coherent. Nested lines under a completed todo move with it when **Roll over children of todos** is enabled.
 
-Completed todos are placed **directly** after the preceding lines in that section—no extra blank line is added between list items. For example, open tasks stay flush above completed ones unless your note already contained blank lines there.
+Blank lines that only sat **between two checkbox todos** are removed so items stay flush; leading blank lines directly under a heading (often introduced when reordering) are trimmed so the list can sit right under the heading when there is no other content in between.
 
 ## Requirements
 
