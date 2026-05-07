@@ -20,6 +20,14 @@ You can also open your command palette (CMD+P on macOS) and start typing `roll` 
 
 Note that if you create a daily note in the future, and you try to run this command, todos will not be rolled into a future date. They will always be rolled to today's note (if it doesn't exist, nothing will happen), from the chronologically closest (in the past) daily note.
 
+Automatic rollover and **Rollover Todos Now** only pull unfinished todos from **that one** previous daily note (the latest daily note before today).
+
+### 3. Command: Rollover todos from all previous daily notes
+
+Use **Rollover todos from all previous daily notes** (command palette) to collect open todos from **every** daily note dated before today, oldest days first, and append them to today's daily note in one pass. If the same parent todo line appears on multiple days, it is only rolled **once** (the earliest occurrence wins).
+
+Your **Previous day todo behavior** setting applies to each source note that contributed todos: duplicate keeps sources unchanged; delete removes contributed lines from those notes; forward rewrites each contributing note’s parent lines as `[>]` with backlinks.
+
 ## Requirements
 
 - [ ] You must have either:

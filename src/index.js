@@ -7,7 +7,7 @@ import {
 import UndoModal from "./ui/UndoModal";
 import RolloverSettingTab from "./ui/RolloverSettingTab";
 import { getTodos } from "./get-todos";
-import { buildForwardTodoData } from "./forward-todos";
+import { buildForwardTodoData, groupTodoBlocks } from "./forward-todos";
 
 const MAX_TIME_SINCE_CREATION = 5000; // 5 seconds
 
@@ -115,6 +115,43 @@ export default class RolloverTodosPlugin extends Plugin {
         this.getFileMoment(a, folder, format).valueOf()
     );
     return sorted[1];
+  }
+
+  /**
+   * All daily notes strictly before today, oldest first (for aggregating open todos).
+   */
+  getDailyNotesBeforeToday() {
+    const { moment } = window;
+    let { folder, format } = getDailyNoteSettings();
+
+    folder = this.getCleanFolder(folder);
+    folder = folder.length === 0 ? folder : folder + "/";
+
+    const dailyNoteRegexMatch = new RegExp("^" + folder + "(.*).md$");
+    const todayStart = moment().startOf("day");
+
+    const dailyNoteFiles = this.app.vault
+      .getMarkdownFiles()
+      .filter((file) => file.path.startsWith(folder))
+      .filter((file) =>
+        moment(
+          file.path.replace(dailyNoteRegexMatch, "$1"),
+          format,
+          true
+        ).isValid()
+      )
+      .filter((file) => file.basename)
+      .filter((file) =>
+        this.getFileMoment(file, folder, format)
+          .startOf("day")
+          .isBefore(todayStart)
+      );
+
+    return dailyNoteFiles.sort(
+      (a, b) =>
+        this.getFileMoment(a, folder, format).valueOf() -
+        this.getFileMoment(b, folder, format).valueOf()
+    );
   }
 
   getFileMoment(file, folder, format) {
@@ -238,10 +275,7 @@ export default class RolloverTodosPlugin extends Plugin {
 
       // setup undo history
       let undoHistoryInstance = {
-        previousDay: {
-          file: undefined,
-          oldContent: "",
-        },
+        previousDays: [],
         today: {
           file: undefined,
           oldContent: "",
@@ -317,10 +351,10 @@ export default class RolloverTodosPlugin extends Plugin {
       // If delete behavior is selected, remove rolled todos from the previous note.
       if (previousDayBehavior === "delete") {
         let lastDailyNoteContent = await this.app.vault.read(lastDailyNote);
-        undoHistoryInstance.previousDay = {
+        undoHistoryInstance.previousDays.push({
           file: lastDailyNote,
           oldContent: `${lastDailyNoteContent}`,
-        };
+        });
         let lines = lastDailyNoteContent.split("\n");
 
         for (let i = lines.length; i >= 0; i--) {
@@ -336,10 +370,10 @@ export default class RolloverTodosPlugin extends Plugin {
       // If forward behavior is selected, mark rolled todos as forwarded in the previous note.
       if (previousDayBehavior === "forward" && sourceReplacements.length > 0) {
         let lastDailyNoteContent = await this.app.vault.read(lastDailyNote);
-        undoHistoryInstance.previousDay = {
+        undoHistoryInstance.previousDays.push({
           file: lastDailyNote,
           oldContent: `${lastDailyNoteContent}`,
-        };
+        });
 
         const lastDailyNoteLines = lastDailyNoteContent.split("\n");
         let searchStart = 0;
@@ -408,6 +442,260 @@ export default class RolloverTodosPlugin extends Plugin {
     }
   }
 
+  /**
+   * Roll unfinished todos from every daily note before today into today's note.
+   * Parent todos that appear identically on multiple days are included once (oldest wins).
+   */
+  async rolloverFromAllPreviousDailyNotes() {
+    if (!this.isDailyNotesEnabled()) {
+      new Notice(
+        "RolloverTodosPlugin unable to rollover unfinished todos: Please enable Daily Notes, or Periodic Notes (with daily notes enabled).",
+        10000
+      );
+      return;
+    }
+
+    const allDailyNotes = getAllDailyNotes();
+    const todayFile = getDailyNote(window.moment(), allDailyNotes);
+    if (!todayFile) return;
+
+    let { folder, format } = getDailyNoteSettings();
+    folder = this.getCleanFolder(folder);
+
+    const todayFormatted = window.moment().format(format);
+    const filePathConstructed = `${folder}${
+      folder == "" ? "" : "/"
+    }${todayFormatted}.${todayFile.extension}`;
+    if (filePathConstructed !== todayFile.path) return;
+
+    const {
+      templateHeading,
+      previousDayBehavior,
+      removeEmptyTodos,
+      leadingNewLine,
+    } = this.settings;
+
+    const previousFiles = this.getDailyNotesBeforeToday();
+    if (previousFiles.length === 0) {
+      new Notice("Rollover: no daily notes found before today.", 6000);
+      return;
+    }
+
+    let emptiesToNotAddToTomorrow = 0;
+    if (removeEmptyTodos) {
+      for (const srcFile of previousFiles) {
+        const rawTodos = await this.getAllUnfinishedTodos(srcFile);
+        rawTodos.forEach((line) => {
+          const trimmedLine = (line || "").trim();
+          if (trimmedLine === "- [ ]" || trimmedLine === "- [  ]") {
+            emptiesToNotAddToTomorrow++;
+          }
+        });
+      }
+    }
+
+    const seenParentTrimmed = new Set();
+    const orderedContributions = [];
+
+    for (const srcFile of previousFiles) {
+      let todos = await this.getAllUnfinishedTodos(srcFile);
+      let filteredTodos = todos;
+      if (removeEmptyTodos) {
+        filteredTodos = [];
+        todos.forEach((line) => {
+          const trimmedLine = (line || "").trim();
+          if (trimmedLine !== "- [ ]" && trimmedLine !== "- [  ]") {
+            filteredTodos.push(line);
+          }
+        });
+      }
+
+      const blocks = groupTodoBlocks(filteredTodos);
+      for (const block of blocks) {
+        const parentKey = block[0].trim();
+        if (seenParentTrimmed.has(parentKey)) continue;
+        seenParentTrimmed.add(parentKey);
+        orderedContributions.push({ file: srcFile, block });
+      }
+    }
+
+    let todosAdded = orderedContributions.reduce(
+      (n, { block }) => n + block.length,
+      0
+    );
+
+    if (orderedContributions.length === 0) {
+      new Notice(
+        emptiesToNotAddToTomorrow > 0
+          ? "Rollover: no todos to roll (only empty items skipped)."
+          : "Rollover: no unfinished todos in earlier daily notes.",
+        6000
+      );
+      return;
+    }
+
+    let todos_today_for_note;
+    const rolledLinesByFile = new Map();
+    const replacementsByFile = new Map();
+
+    for (const { file: srcFile, block } of orderedContributions) {
+      if (!rolledLinesByFile.has(srcFile)) rolledLinesByFile.set(srcFile, []);
+      rolledLinesByFile.get(srcFile).push(...block);
+    }
+
+    if (previousDayBehavior === "forward") {
+      todos_today_for_note = [];
+      for (const { file: srcFile, block } of orderedContributions) {
+        const forwardTodoData = buildForwardTodoData({
+          todos: block,
+          sourceDailyNote: srcFile.basename,
+          destinationDailyNote: todayFile.basename,
+        });
+        todos_today_for_note.push(...forwardTodoData.todosForToday);
+        if (!replacementsByFile.has(srcFile))
+          replacementsByFile.set(srcFile, []);
+        replacementsByFile.get(srcFile).push(...forwardTodoData.sourceReplacements);
+      }
+    } else {
+      todos_today_for_note = orderedContributions.flatMap(({ block }) => block);
+    }
+
+    let undoHistoryInstance = {
+      previousDays: [],
+      today: {
+        file: undefined,
+        oldContent: "",
+      },
+    };
+
+    let templateHeadingNotFoundMessage = "";
+    const templateHeadingSelected = templateHeading !== "none";
+
+    if (todos_today_for_note.length > 0) {
+      let dailyNoteContent = await this.app.vault.read(todayFile);
+      undoHistoryInstance.today = {
+        file: todayFile,
+        oldContent: `${dailyNoteContent}`,
+      };
+      const todos_todayString = `\n${todos_today_for_note.join("\n")}`;
+
+      if (templateHeadingSelected) {
+        const contentAddedToHeading = dailyNoteContent.replace(
+          templateHeading,
+          `${templateHeading}${leadingNewLine ? "\n" : ""}${todos_todayString}`
+        );
+        if (contentAddedToHeading == dailyNoteContent) {
+          templateHeadingNotFoundMessage = `Rollover couldn't find '${templateHeading}' in today's daily not. Rolling todos to end of file.`;
+        } else {
+          dailyNoteContent = contentAddedToHeading;
+        }
+      }
+
+      if (
+        !templateHeadingSelected ||
+        templateHeadingNotFoundMessage.length > 0
+      ) {
+        dailyNoteContent += todos_todayString;
+      }
+
+      await this.app.vault.modify(todayFile, dailyNoteContent);
+    }
+
+    if (previousDayBehavior === "delete") {
+      for (const [srcFile, linesToRemove] of rolledLinesByFile) {
+        let srcContent = await this.app.vault.read(srcFile);
+        undoHistoryInstance.previousDays.push({
+          file: srcFile,
+          oldContent: `${srcContent}`,
+        });
+        let lines = srcContent.split("\n");
+
+        for (let i = lines.length; i >= 0; i--) {
+          if (linesToRemove.includes(lines[i])) {
+            lines.splice(i, 1);
+          }
+        }
+
+        await this.app.vault.modify(srcFile, lines.join("\n"));
+      }
+    }
+
+    if (previousDayBehavior === "forward") {
+      for (const [srcFile, replacements] of replacementsByFile) {
+        if (!replacements.length) continue;
+
+        let srcContent = await this.app.vault.read(srcFile);
+        undoHistoryInstance.previousDays.push({
+          file: srcFile,
+          oldContent: `${srcContent}`,
+        });
+
+        const srcLines = srcContent.split("\n");
+        let searchStart = 0;
+
+        replacements.forEach((replacement) => {
+          let lineToReplaceIndex = srcLines.findIndex(
+            (line, index) => index >= searchStart && line === replacement.from
+          );
+
+          if (lineToReplaceIndex === -1) {
+            lineToReplaceIndex = srcLines.findIndex(
+              (line) => line === replacement.from
+            );
+          }
+
+          if (lineToReplaceIndex === -1) {
+            return;
+          }
+
+          srcLines[lineToReplaceIndex] = replacement.to;
+          searchStart = lineToReplaceIndex + 1;
+        });
+
+        await this.app.vault.modify(srcFile, srcLines.join("\n"));
+      }
+    }
+
+    const todosAddedString =
+      todosAdded === 0
+        ? ""
+        : `- ${todosAdded} todo${todosAdded > 1 ? "s" : ""} rolled over from earlier notes.`;
+    const emptiesToNotAddToTomorrowString =
+      emptiesToNotAddToTomorrow === 0
+        ? ""
+        : previousDayBehavior === "delete"
+        ? `- ${emptiesToNotAddToTomorrow} empty todo${
+            emptiesToNotAddToTomorrow > 1 ? "s" : ""
+          } skipped.`
+        : "";
+
+    const part1 =
+      templateHeadingNotFoundMessage.length > 0
+        ? `${templateHeadingNotFoundMessage}`
+        : "";
+    const part2 = `${todosAddedString}${
+      todosAddedString.length > 0 ? " " : ""
+    }`;
+    const part3 = `${emptiesToNotAddToTomorrowString}${
+      emptiesToNotAddToTomorrowString.length > 0 ? " " : ""
+    }`;
+
+    let allParts = [part1, part2, part3];
+    let nonBlankLines = [];
+    allParts.forEach((part) => {
+      if (part.length > 0) {
+        nonBlankLines.push(part);
+      }
+    });
+
+    const message = nonBlankLines.join("\n");
+    if (message.length > 0) {
+      new Notice(message, 4000 + message.length * 3);
+    }
+    this.undoHistoryTime = new Date();
+    this.undoHistory = [undoHistoryInstance];
+  }
+
   async onload() {
     await this.loadSettings();
     this.undoHistory = [];
@@ -428,6 +716,14 @@ export default class RolloverTodosPlugin extends Plugin {
       name: "Rollover Todos Now",
       callback: () => {
         this.rollover();
+      },
+    });
+
+    this.addCommand({
+      id: "obsidian-rollover-daily-todos-rollover-all-previous",
+      name: "Rollover todos from all previous daily notes",
+      callback: () => {
+        this.rolloverFromAllPreviousDailyNotes();
       },
     });
 
