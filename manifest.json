@@ -1,9 +1,9 @@
 {
-  "id": "obsidian-rollover-daily-todos",
-  "name": "Rollover Daily Todos",
+  "id": "rollover-daily-todos-with-context",
+  "name": "Rollover Daily Todos with Context",
   "version": "1.0.0",
   "minAppVersion": "0.12.12",
-  "description": "Roll incomplete todos from the previous daily note into today's daily note.",
+  "description": "Rollover any unchecked checkboxes from your last daily note into today's note, with context.",
   "author": "Michael Parker",
   "authorUrl": "https://github.com/mjparker",
   "isDesktopOnly": false
