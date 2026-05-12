@@ -29,26 +29,149 @@ export const trimLeadingEmptyLines = (lines) => {
   return lines.slice(start);
 };
 
+const arraysEqual = (a, b) =>
+  a.length === b.length && a.every((line, i) => line === b[i]);
+
+const reorderLinesWithCompletedAtBottom = (lines, settings) => {
+  const markers = settings.doneStatusMarkers || "xX-";
+  let next = moveCompletedTodoBlocksToBottom(lines, settings);
+  next = removeBlankLinesBetweenAdjacentCheckboxLines(next, markers);
+  return trimLeadingEmptyLines(next);
+};
+
+/** Line indices that sit in any ATX heading section body (below a heading, until sibling-or-higher). */
+export const getHeadingBodyLineIndices = (lines) => {
+  const covered = new Set();
+  for (let i = 0; i < lines.length; i++) {
+    const m = lines[i].match(/^(#{1,6})\s/);
+    if (!m) continue;
+    const end = findSectionEndExclusive(lines, i, m[1].length);
+    for (let j = i + 1; j < end; j++) {
+      covered.add(j);
+    }
+  }
+  return covered;
+};
+
+/** Contiguous line ranges not covered by heading section bodies. */
+export const findUnheadedLineRanges = (lines) => {
+  const covered = getHeadingBodyLineIndices(lines);
+  const ranges = [];
+  let start = null;
+
+  for (let i = 0; i < lines.length; i++) {
+    if (covered.has(i)) {
+      if (start !== null) {
+        ranges.push({ start, end: i });
+        start = null;
+      }
+      continue;
+    }
+    if (start === null) {
+      start = i;
+    }
+  }
+  if (start !== null) {
+    ranges.push({ start, end: lines.length });
+  }
+  return ranges;
+};
+
+/**
+ * Split a line range into groups separated by one or more blank lines.
+ * Each group is { start, end } indices relative to the full lines array.
+ */
+export const splitRangeIntoBlankSeparatedGroups = (lines, rangeStart, rangeEnd) => {
+  const groups = [];
+  let groupStart = null;
+
+  for (let i = rangeStart; i < rangeEnd; i++) {
+    if (lines[i] === "") {
+      if (groupStart !== null) {
+        groups.push({ start: groupStart, end: i });
+        groupStart = null;
+      }
+      continue;
+    }
+    if (groupStart === null) {
+      groupStart = i;
+    }
+  }
+  if (groupStart !== null) {
+    groups.push({ start: groupStart, end: rangeEnd });
+  }
+  return groups;
+};
+
+const groupContainsCheckboxTodo = (lines, group, doneStatusMarkers) =>
+  lines
+    .slice(group.start, group.end)
+    .some((line) => getCheckboxTodoStatus(line, doneStatusMarkers) !== null);
+
+/**
+ * Reorder completed todos in each blank-line-separated list outside headings.
+ * @returns {boolean} whether lines were modified
+ */
+export const applyMoveCompletedToUnheadedListGroups = (lines, settings) => {
+  const markers = settings.doneStatusMarkers || "xX-";
+  const ranges = findUnheadedLineRanges(lines);
+  let changed = false;
+
+  for (let r = ranges.length - 1; r >= 0; r--) {
+    const { start, end } = ranges[r];
+    const groups = splitRangeIntoBlankSeparatedGroups(lines, start, end);
+    if (groups.length === 0) {
+      continue;
+    }
+
+    const rebuilt = [];
+    let lastGroupEnd = start;
+
+    for (const group of groups) {
+      for (let i = lastGroupEnd; i < group.start; i++) {
+        rebuilt.push(lines[i]);
+      }
+      const groupLines = lines.slice(group.start, group.end);
+      const nextGroupLines = groupContainsCheckboxTodo(lines, group, markers)
+        ? reorderLinesWithCompletedAtBottom(groupLines, settings)
+        : groupLines;
+      if (!arraysEqual(groupLines, nextGroupLines)) {
+        changed = true;
+      }
+      rebuilt.push(...nextGroupLines);
+      lastGroupEnd = group.end;
+    }
+    for (let i = lastGroupEnd; i < end; i++) {
+      rebuilt.push(lines[i]);
+    }
+
+    if (!arraysEqual(lines.slice(start, end), rebuilt)) {
+      lines.splice(start, end - start, ...rebuilt);
+      changed = true;
+    }
+  }
+
+  return changed;
+};
+
 /**
  * Walk all ATX headings (deepest first, then bottom-up) and reorder completed
- * todos within each section until no section changes.
+ * todos within each section; also reorder unheaded list groups separated by blanks.
  */
 export const applyMoveCompletedToAllSections = (lines, settings) => {
-  const markers = settings.doneStatusMarkers || "xX-";
   let working = lines.slice();
   let anyChanged = false;
   let guard = 0;
 
   while (guard++ < 100) {
+    let passChanged = false;
+
     const headings = [];
     for (let i = 0; i < working.length; i++) {
       const m = working[i].match(/^(#{1,6})\s/);
       if (m) {
         headings.push({ line: i, level: m[1].length });
       }
-    }
-    if (headings.length === 0) {
-      break;
     }
 
     headings.sort((a, b) => {
@@ -58,23 +181,23 @@ export const applyMoveCompletedToAllSections = (lines, settings) => {
       return b.line - a.line;
     });
 
-    let passChanged = false;
     for (const h of headings) {
       const end = findSectionEndExclusive(working, h.line, h.level);
       const body = working.slice(h.line + 1, end);
-      let newBody = moveCompletedTodoBlocksToBottom(body, settings);
-      newBody = removeBlankLinesBetweenAdjacentCheckboxLines(newBody, markers);
-      newBody = trimLeadingEmptyLines(newBody);
+      const newBody = reorderLinesWithCompletedAtBottom(body, settings);
 
-      const unchanged =
-        body.length === newBody.length &&
-        body.every((line, i) => line === newBody[i]);
-
-      if (!unchanged) {
+      if (!arraysEqual(body, newBody)) {
         working.splice(h.line + 1, end - h.line - 1, ...newBody);
         anyChanged = true;
         passChanged = true;
         break;
+      }
+    }
+
+    if (!passChanged) {
+      if (applyMoveCompletedToUnheadedListGroups(working, settings)) {
+        anyChanged = true;
+        passChanged = true;
       }
     }
 

@@ -34,6 +34,8 @@ With your **daily note** open in the editor, run **Move completed todos to botto
 
 The plugin walks **every ATX heading** (`#` … `######`) in the file. Under each heading, it takes lines until the next heading of the **same or higher** level, and moves completed checkbox tasks (per **Done status markers**) to the **bottom of that section**, below incomplete todos and other lines (paragraphs, bullets without checkboxes, nested headings as plain lines, etc.). Deeper headings (`###` inside `##`) are handled **first**, then outer sections, so nested lists stay coherent. Nested lines under a completed todo move with it when **Roll over children of todos** is enabled.
 
+**Unheaded lists** (for example broad todos at the top or bottom of the note, before the first heading or after the last section) are handled too: each run of lines separated from the next by a **blank line** is treated as its own list, and completed todos move to the bottom of that run only.
+
 Blank lines that only sat **between two checkbox todos** are removed so items stay flush; leading blank lines directly under a heading (often introduced when reordering) are trimmed so the list can sit right under the heading when there is no other content in between.
 
 ## Requirements

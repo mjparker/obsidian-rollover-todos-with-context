@@ -49,6 +49,56 @@ test("trimLeadingEmptyLines removes blank lines before first content", () => {
   expect(trimLeadingEmptyLines(["", "", "x"])).toStrictEqual(["x"]);
 });
 
+test("applyMoveCompletedToAllSections updates unheaded list groups separated by blanks", () => {
+  const lines = [
+    "- [x] done top",
+    "- [ ] open top",
+    "",
+    "- [ ] open bottom",
+    "- [x] done bottom",
+  ];
+
+  const { lines: out, changed } = applyMoveCompletedToAllSections(lines, {
+    doneStatusMarkers: "xX-",
+    rolloverChildren: false,
+  });
+
+  expect(changed).toBe(true);
+  expect(out).toStrictEqual([
+    "- [ ] open top",
+    "- [x] done top",
+    "",
+    "- [ ] open bottom",
+    "- [x] done bottom",
+  ]);
+});
+
+test("applyMoveCompletedToAllSections updates heading sections and unheaded preamble", () => {
+  const lines = [
+    "- [x] preamble done",
+    "- [ ] preamble open",
+    "",
+    "## RCC",
+    "- [x] section done",
+    "- [ ] section open",
+  ];
+
+  const { lines: out, changed } = applyMoveCompletedToAllSections(lines, {
+    doneStatusMarkers: "xX-",
+    rolloverChildren: false,
+  });
+
+  expect(changed).toBe(true);
+  expect(out).toStrictEqual([
+    "- [ ] preamble open",
+    "- [x] preamble done",
+    "",
+    "## RCC",
+    "- [ ] section open",
+    "- [x] section done",
+  ]);
+});
+
 test("applyMoveCompletedToAllSections updates every heading section", () => {
   const lines = [
     "## A",
