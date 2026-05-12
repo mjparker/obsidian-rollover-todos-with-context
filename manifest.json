@@ -3,7 +3,7 @@
   "name": "Rollover Daily Todos",
   "version": "1.0.0",
   "minAppVersion": "0.12.12",
-  "description": "This Obsidian.md plugin rolls over incomplete TODOs from the previous daily note to today's daily note. (https://obsidian.md). (Originally created by Matthew Sessions)",
+  "description": "Roll incomplete todos from the previous daily note into today's daily note.",
   "author": "Michael Parker",
   "authorUrl": "https://github.com/mjparker",
   "isDesktopOnly": false

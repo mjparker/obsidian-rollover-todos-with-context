@@ -1,6 +1,6 @@
 # Rollover Daily Todos
 
-[![Build](https://github.com/lumoe/obsidian-rollover-daily-todos/actions/workflows/ci.yml/badge.svg)](https://github.com/lumoe/obsidian-rollover-daily-todos/actions/workflows/ci.yml)
+[![Build](https://github.com/mjparker/obsidian-rollover-daily-todos/actions/workflows/ci.yml/badge.svg)](https://github.com/mjparker/obsidian-rollover-daily-todos/actions/workflows/ci.yml)
 
 This Obsidian plugin will rollover any incomplete todo items from the previous daily note (could be yesterday, or a week ago) to today. This is triggered automatically when a new daily note is created via the internal `Daily notes` plugin, or the `Periodic Notes` plugin., It can also be run as a command from the Command Palette.
 
@@ -149,3 +149,7 @@ Use this when you are developing locally or installing from a Git clone instead 
 ### Community Plugins
 
 You can also install released versions from Obsidian’s **Community Plugins** tab when this plugin is listed there (search for **Rollover Daily Todos**).
+
+## Attribution
+
+This plugin is maintained by Michael Parker. It extends [Rollover Daily Todos](https://github.com/lumoe/obsidian-rollover-daily-todos) by Lukas Mölschl, which built on the original rollover-daily-todos idea by Matthew Sessions.
