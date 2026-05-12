@@ -18,15 +18,29 @@ export default class RolloverSettingTab extends PluginSettingTab {
     }
 
     if (file === null) {
-      // file not available, no template-heading can be returned
       return [];
     }
 
     const templateContents = await this.app.vault.read(file);
     const allHeadings = Array.from(templateContents.matchAll(/#{1,} .*/g)).map(
-      ([heading]) => heading
+      ([heading]) => heading,
     );
     return allHeadings;
+  }
+
+  getPreviousDayBehaviorDescription() {
+    const behavior = this.plugin.settings.previousDayBehavior || "forward";
+
+    const behaviorEffects = {
+      duplicate:
+        "The previous daily note keeps its todos and copies are added to today.",
+      delete:
+        "Rolled todos are removed from the previous daily note after they are added to today.",
+      forward:
+        "Eligible open todos in the previous daily note are marked `[>]` with a backlink to today, and today's copies note where they came from.",
+    };
+
+    return `Automatic rollover on creation and Rollover Todos Now use only the most recent daily note before today. ${behaviorEffects[behavior] || behaviorEffects.forward}`;
   }
 
   async display() {
@@ -35,7 +49,9 @@ export default class RolloverSettingTab extends PluginSettingTab {
     this.containerEl.empty();
     new Setting(this.containerEl)
       .setName("Template heading")
-      .setDesc("Which heading from your template should the todos go under")
+      .setDesc(
+        "Choose a heading from your daily note template where rolled todos should be inserted. Todos are collected from the entire source note regardless of heading. None appends them to the end of today's note.",
+      )
       .addDropdown((dropdown) =>
         dropdown
           .addOptions({
@@ -49,14 +65,12 @@ export default class RolloverSettingTab extends PluginSettingTab {
           .onChange((value) => {
             this.plugin.settings.templateHeading = value;
             this.plugin.saveSettings();
-          })
+          }),
       );
 
-    new Setting(this.containerEl)
+    const previousDayBehaviorSetting = new Setting(this.containerEl)
       .setName("Previous day todo behavior")
-      .setDesc(
-        `Choose how rolled todos affect the previous daily note: keep duplicates, delete source todos, or mark source todos as forwarded with backlinks.`
-      )
+      .setDesc(this.getPreviousDayBehaviorDescription())
       .addDropdown((dropdown) =>
         dropdown
           .addOptions({
@@ -64,67 +78,62 @@ export default class RolloverSettingTab extends PluginSettingTab {
             delete: "Delete todos from previous day",
             forward: "Mark todos as forwarded",
           })
-          .setValue(this.plugin.settings.previousDayBehavior || "duplicate")
+          .setValue(this.plugin.settings.previousDayBehavior || "forward")
           .onChange((value) => {
             this.plugin.settings.previousDayBehavior = value;
             this.plugin.saveSettings();
-          })
+            previousDayBehaviorSetting.setDesc(
+              this.getPreviousDayBehaviorDescription(),
+            );
+          }),
       );
 
     new Setting(this.containerEl)
       .setName("Remove empty todos in rollover")
       .setDesc(
-        `If you have empty todos, they will not be rolled over to the next day.`
+        "Skip checkbox todos with no text (for example `- [ ]`) when rolling them into today's note.",
       )
       .addToggle((toggle) =>
         toggle
-          .setValue(this.plugin.settings.removeEmptyTodos || false)
+          .setValue(this.plugin.settings.removeEmptyTodos ?? true)
           .onChange((value) => {
             this.plugin.settings.removeEmptyTodos = value;
             this.plugin.saveSettings();
-          })
+          }),
       );
 
     new Setting(this.containerEl)
       .setName("Roll over children of todos")
       .setDesc(
-        `By default, only the actual todos are rolled over. If you add nested Markdown-elements beneath your todos, these are not rolled over but stay in place, possibly altering the logic of your previous note. This setting allows for also migrating the nested elements.`
+        "Also roll nested lines under a todo, such as indented notes or sub-items. When disabled, only the parent todo line moves.",
       )
       .addToggle((toggle) =>
         toggle
-          .setValue(this.plugin.settings.rolloverChildren || false)
+          .setValue(this.plugin.settings.rolloverChildren ?? true)
           .onChange((value) => {
             this.plugin.settings.rolloverChildren = value;
             this.plugin.saveSettings();
-          })
+          }),
       );
 
     new Setting(this.containerEl)
-      .setName("Automatic rollover on daily note open")
+      .setName("Automatic rollover on daily note creation")
       .setDesc(
-        `If enabled, the plugin will automatically rollover todos when you open a daily note.`
+        "When enabled, unfinished todos from the previous daily note are rolled into today's note as soon as today's daily note file is created. This does not run when you merely open an existing note.",
       )
       .addToggle((toggle) =>
         toggle
-          // Default to true if the setting is not set
-          .setValue(
-            this.plugin.settings.rolloverOnFileCreate === undefined ||
-              this.plugin.settings.rolloverOnFileCreate === null
-              ? true
-              : this.plugin.settings.rolloverOnFileCreate
-          )
+          .setValue(this.plugin.settings.rolloverOnFileCreate ?? true)
           .onChange((value) => {
-            console.log(value);
             this.plugin.settings.rolloverOnFileCreate = value;
             this.plugin.saveSettings();
-            this.plugin.loadData().then((value) => console.log(value));
-          })
+          }),
       );
 
     new Setting(this.containerEl)
       .setName("Done status markers")
       .setDesc(
-        `Characters that represent done status in checkboxes. Default is "xX-". Add any characters that should be considered as marking a task complete.`
+        'Characters inside `[...]` that mark a checkbox as done. Default is "xX-". Tasks already marked `[>]` are never rolled again.',
       )
       .addText((text) =>
         text
@@ -132,24 +141,21 @@ export default class RolloverSettingTab extends PluginSettingTab {
           .onChange((value) => {
             this.plugin.settings.doneStatusMarkers = value;
             this.plugin.saveSettings();
-          })
+          }),
       );
+
     new Setting(this.containerEl)
       .setName("Add extra blank line between Heading and Todos")
-      .setDesc(`Whether to add an extra blank line between the selected Heading and the rolled over todos. This will only work in combination with a configured Template Heading.`)
-      .addToggle((toggle) => 
+      .setDesc(
+        "Insert an extra blank line between the selected template heading and rolled todos. Only applies when a template heading is selected.",
+      )
+      .addToggle((toggle) =>
         toggle
-          .setValue(
-            this.plugin.settings
-              .leadingNewLine === undefined || 
-              this.plugin.settings.leadingNewLine === null 
-              ? true 
-              : this.plugin.settings.leadingNewLine
-          )
+          .setValue(this.plugin.settings.leadingNewLine ?? false)
           .onChange((value) => {
             this.plugin.settings.leadingNewLine = value;
             this.plugin.saveSettings();
-          })
+          }),
       );
   }
 }
