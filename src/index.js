@@ -60,7 +60,11 @@ export default class RolloverTodosPlugin extends Plugin {
         : "duplicate";
     }
 
-    if (!["duplicate", "delete", "forward"].includes(this.settings.previousDayBehavior)) {
+    if (
+      !["duplicate", "delete", "forward"].includes(
+        this.settings.previousDayBehavior,
+      )
+    ) {
       this.settings.previousDayBehavior = "duplicate";
     }
   }
@@ -98,22 +102,22 @@ export default class RolloverTodosPlugin extends Plugin {
         moment(
           file.path.replace(dailyNoteRegexMatch, "$1"),
           format,
-          true
-        ).isValid()
+          true,
+        ).isValid(),
       )
       .filter((file) => file.basename)
       .filter((file) =>
         this.getFileMoment(file, folder, format).isSameOrBefore(
           todayMoment,
-          "day"
-        )
+          "day",
+        ),
       );
 
     // sort by date
     const sorted = dailyNoteFiles.sort(
       (a, b) =>
         this.getFileMoment(b, folder, format).valueOf() -
-        this.getFileMoment(a, folder, format).valueOf()
+        this.getFileMoment(a, folder, format).valueOf(),
     );
     return sorted[1];
   }
@@ -138,20 +142,20 @@ export default class RolloverTodosPlugin extends Plugin {
         moment(
           file.path.replace(dailyNoteRegexMatch, "$1"),
           format,
-          true
-        ).isValid()
+          true,
+        ).isValid(),
       )
       .filter((file) => file.basename)
       .filter((file) =>
         this.getFileMoment(file, folder, format)
           .startOf("day")
-          .isBefore(todayStart)
+          .isBefore(todayStart),
       );
 
     return dailyNoteFiles.sort(
       (a, b) =>
         this.getFileMoment(a, folder, format).valueOf() -
-        this.getFileMoment(b, folder, format).valueOf()
+        this.getFileMoment(b, folder, format).valueOf(),
     );
   }
 
@@ -186,7 +190,7 @@ export default class RolloverTodosPlugin extends Plugin {
     ///console.log('testing')
     const templateContents = await this.app.vault.read(file);
     const allHeadings = Array.from(templateContents.matchAll(/#{1,} .*/g)).map(
-      ([heading]) => heading
+      ([heading]) => heading,
     );
 
     if (allHeadings.length > 0) {
@@ -229,7 +233,7 @@ export default class RolloverTodosPlugin extends Plugin {
 
     const { lines: newLines, changed } = applyMoveCompletedToAllSections(
       lines,
-      settings
+      settings,
     );
 
     if (!changed) {
@@ -245,7 +249,7 @@ export default class RolloverTodosPlugin extends Plugin {
     await this.app.vault.modify(file, out);
     new Notice(
       "Moved completed todos to the bottom of each section in this note.",
-      5000
+      5000,
     );
   }
 
@@ -300,7 +304,7 @@ export default class RolloverTodosPlugin extends Plugin {
     if (!this.isDailyNotesEnabled()) {
       new Notice(
         "RolloverTodosPlugin unable to rollover unfinished todos: Please enable Daily Notes, or Periodic Notes (with daily notes enabled).",
-        10000
+        10000,
       );
     } else {
       const {
@@ -308,8 +312,7 @@ export default class RolloverTodosPlugin extends Plugin {
         previousDayBehavior,
         removeEmptyTodos,
         leadingNewLine,
-      } =
-        this.settings;
+      } = this.settings;
 
       // check if there is a daily note from yesterday
       const lastDailyNote = this.getLastDailyNote();
@@ -322,7 +325,7 @@ export default class RolloverTodosPlugin extends Plugin {
       let todos_yesterday = await this.getAllUnfinishedTodos(lastDailyNote);
 
       console.log(
-        `rollover-daily-todos: ${todos_yesterday.length} todos found in ${lastDailyNote.basename}.md`
+        `rollover-daily-todos: ${todos_yesterday.length} todos found in ${lastDailyNote.basename}.md`,
       );
 
       if (todos_yesterday.length == 0) {
@@ -369,10 +372,13 @@ export default class RolloverTodosPlugin extends Plugin {
         todosAdded = todos_today_for_note.length;
       }
 
-      if (previousDayBehavior === "forward" && todos_today_for_note.length === 0) {
+      if (
+        previousDayBehavior === "forward" &&
+        todos_today_for_note.length === 0
+      ) {
         new Notice(
           "Rollover: nothing to forward—only open `- [ ]` tasks are forwarded.",
-          8000
+          8000,
         );
         return;
       }
@@ -393,7 +399,9 @@ export default class RolloverTodosPlugin extends Plugin {
         if (templateHeadingSelected) {
           const contentAddedToHeading = dailyNoteContent.replace(
             templateHeading,
-            `${templateHeading}${leadingNewLine ? '\n' : ''}${todos_todayString}`
+            `${templateHeading}${
+              leadingNewLine ? "\n" : ""
+            }${todos_todayString}`,
           );
           if (contentAddedToHeading == dailyNoteContent) {
             templateHeadingNotFoundMessage = `Rollover couldn't find '${templateHeading}' in today's daily not. Rolling todos to end of file.`;
@@ -445,12 +453,12 @@ export default class RolloverTodosPlugin extends Plugin {
 
         sourceReplacements.forEach((replacement) => {
           let lineToReplaceIndex = lastDailyNoteLines.findIndex(
-            (line, index) => index >= searchStart && line === replacement.from
+            (line, index) => index >= searchStart && line === replacement.from,
           );
 
           if (lineToReplaceIndex === -1) {
             lineToReplaceIndex = lastDailyNoteLines.findIndex(
-              (line) => line === replacement.from
+              (line) => line === replacement.from,
             );
           }
 
@@ -515,7 +523,7 @@ export default class RolloverTodosPlugin extends Plugin {
     if (!this.isDailyNotesEnabled()) {
       new Notice(
         "RolloverTodosPlugin unable to rollover unfinished todos: Please enable Daily Notes, or Periodic Notes (with daily notes enabled).",
-        10000
+        10000,
       );
       return;
     }
@@ -586,7 +594,7 @@ export default class RolloverTodosPlugin extends Plugin {
 
     let todosAdded = orderedContributions.reduce(
       (n, { block }) => n + block.length,
-      0
+      0,
     );
 
     if (orderedContributions.length === 0) {
@@ -594,7 +602,7 @@ export default class RolloverTodosPlugin extends Plugin {
         emptiesToNotAddToTomorrow > 0
           ? "Rollover: no todos to roll (only empty items skipped)."
           : "Rollover: no unfinished todos in earlier daily notes.",
-        6000
+        6000,
       );
       return;
     }
@@ -619,17 +627,22 @@ export default class RolloverTodosPlugin extends Plugin {
         todos_today_for_note.push(...forwardTodoData.todosForToday);
         if (!replacementsByFile.has(srcFile))
           replacementsByFile.set(srcFile, []);
-        replacementsByFile.get(srcFile).push(...forwardTodoData.sourceReplacements);
+        replacementsByFile
+          .get(srcFile)
+          .push(...forwardTodoData.sourceReplacements);
       }
       todosAdded = todos_today_for_note.length;
     } else {
       todos_today_for_note = orderedContributions.flatMap(({ block }) => block);
     }
 
-    if (previousDayBehavior === "forward" && todos_today_for_note.length === 0) {
+    if (
+      previousDayBehavior === "forward" &&
+      todos_today_for_note.length === 0
+    ) {
       new Notice(
         "Rollover: nothing to forward—only open `- [ ]` tasks are forwarded.",
-        8000
+        8000,
       );
       return;
     }
@@ -656,7 +669,7 @@ export default class RolloverTodosPlugin extends Plugin {
       if (templateHeadingSelected) {
         const contentAddedToHeading = dailyNoteContent.replace(
           templateHeading,
-          `${templateHeading}${leadingNewLine ? "\n" : ""}${todos_todayString}`
+          `${templateHeading}${leadingNewLine ? "\n" : ""}${todos_todayString}`,
         );
         if (contentAddedToHeading == dailyNoteContent) {
           templateHeadingNotFoundMessage = `Rollover couldn't find '${templateHeading}' in today's daily not. Rolling todos to end of file.`;
@@ -709,12 +722,12 @@ export default class RolloverTodosPlugin extends Plugin {
 
         replacements.forEach((replacement) => {
           let lineToReplaceIndex = srcLines.findIndex(
-            (line, index) => index >= searchStart && line === replacement.from
+            (line, index) => index >= searchStart && line === replacement.from,
           );
 
           if (lineToReplaceIndex === -1) {
             lineToReplaceIndex = srcLines.findIndex(
-              (line) => line === replacement.from
+              (line) => line === replacement.from,
             );
           }
 
@@ -733,7 +746,9 @@ export default class RolloverTodosPlugin extends Plugin {
     const todosAddedString =
       todosAdded === 0
         ? ""
-        : `- ${todosAdded} todo${todosAdded > 1 ? "s" : ""} rolled over from earlier notes.`;
+        : `- ${todosAdded} todo${
+            todosAdded > 1 ? "s" : ""
+          } rolled over from earlier notes.`;
     const emptiesToNotAddToTomorrowString =
       emptiesToNotAddToTomorrow === 0
         ? ""
@@ -782,7 +797,7 @@ export default class RolloverTodosPlugin extends Plugin {
         // Check if automatic daily note creation is enabled
         if (!this.settings.rolloverOnFileCreate) return;
         this.rollover(file);
-      })
+      }),
     );
 
     this.addCommand({
@@ -810,7 +825,7 @@ export default class RolloverTodosPlugin extends Plugin {
     });
 
     this.addCommand({
-      id: "obsidian-rollover-daily-todos-undo",
+      id: "-undo",
       name: "Undo last rollover",
       checkCallback: (checking) => {
         // no history, don't allow undo

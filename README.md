@@ -1,10 +1,10 @@
 # Rollover Daily Todos
 
-[![Build](https://github.com/mjparker/obsidian-rollover-daily-todos/actions/workflows/ci.yml/badge.svg)](https://github.com/mjparker/obsidian-rollover-daily-todos/actions/workflows/ci.yml)
+[Build](https://github.com/mjparker/obsidian-rollover-daily-todos/actions/workflows/ci.yml)
 
 This Obsidian plugin will rollover any incomplete todo items from the previous daily note (could be yesterday, or a week ago) to today. This is triggered automatically when a new daily note is created via the internal `Daily notes` plugin, or the `Periodic Notes` plugin., It can also be run as a command from the Command Palette.
 
-![A demo of the plugin working](./demo.gif)
+A demo of the plugin working
 
 ## Usage
 
@@ -40,10 +40,10 @@ Blank lines that only sat **between two checkbox todos** are removed so items st
 
 ## Requirements
 
-- [ ] You must have either:
+- You must have either:
   1. `Daily notes` plugin installed _or_
   2. `Periodic Notes` plugin installed AND the **Daily Notes** setting toggled on
-- [ ] A Note folder set in one of these plugins. Inside it you must have:
+- A Note folder set in one of these plugins. Inside it you must have:
   1. 2 or more notes
   2. All notes must be named in the format you use for daily notes (for example `2021-08-29` for `YYYY-MM-DD` )
 
@@ -67,7 +67,7 @@ You can choose one of three behaviors:
 
 - `Duplicate (default)`: Keep yesterday's todos and copy them into today.
 - `Delete`: Remove rolled todos from the previous day after they are added to today's note. This is destructive.
-- `Mark todos as forwarded`: Only applies to **open** tasks whose checkbox is a single space: `- [ ]` (same for `*`/`+` list markers). Other incomplete markers (for example `- [/]` from Tasks) are not forwarded; neither are lines already marked `- [>]`. The plugin turns eligible lines into `- [>]`, appends ` (forwarded to [[today-note]])`, and adds ` (forwarded from [[previous-note]])` on today's copy.
+- `Mark todos as forwarded`: Only applies to **open** tasks whose checkbox is a single space: `- [ ]` (same for `*`/`+` list markers). Other incomplete markers (for example `- [/]` from Tasks) are not forwarded; neither are lines already marked `- [>]`. The plugin turns eligible lines into `- [>]`, appends `(forwarded to [[today-note]])`, and adds `(forwarded from [[previous-note]])` on today's copy.
 
 If you use the `Undo last rollover` command, both note files are restored to their pre-rollover state (within the 2-minute undo window).
 
@@ -92,10 +92,10 @@ The plugin supports Unicode characters, including complex emoji and grapheme clu
 1. Sometimes you will use this plugin, and your unfinished todos will stay in the same spot. These could be formatting issues.
 
 - Regex is used to search for unfinished todos: `/\s*[-*+] \[[^xX-]\].*/g` (or with your custom done markers)
-- At a minimum, they need to look like: `start of line | tabs`-` `[` `]`Your text goes here`
+- At a minimum, they need to look like: `start of line | tabs`- `[ `]`Your text goes here`
 - If you use spaces instead of tabs at the start of the line, the behavior of the plugin can be inconsistent. Sometimes it'll roll items over, but not delete them from the previous day when you have that option toggled on.
 
-2. Sometimes, if you trigger the `rollover` function too quickly, it will read the state of a file before the new data was saved to disk. For example, if you add a new incomplete todo to yesterday's daily note, and then quickly run the `Rollover Todos Now` command, it may grab the state of the file a second or two before you ran the command. If this happens, just run the `Undo last rollover` command. Wait a second or two, then try rolling over todos again.
+1. Sometimes, if you trigger the `rollover` function too quickly, it will read the state of a file before the new data was saved to disk. For example, if you add a new incomplete todo to yesterday's daily note, and then quickly run the `Rollover Todos Now` command, it may grab the state of the file a second or two before you ran the command. If this happens, just run the `Undo last rollover` command. Wait a second or two, then try rolling over todos again.
 
 For example (no template heading, empty todos toggled on):
 
@@ -114,7 +114,7 @@ And the previous day might look like
 - [x] Do the dishes
 ```
 
-3. There are sometimes conflicts with other plugins that deal with new notes -- particularly the Templater plugin. In these situations, your todos may be removed from your previous note, and then not be saved into your new daily note. The simplest remedy is to disable the automatic rollover, and instead trigger it manually.
+1. There are sometimes conflicts with other plugins that deal with new notes -- particularly the Templater plugin. In these situations, your todos may be removed from your previous note, and then not be saved into your new daily note. The simplest remedy is to disable the automatic rollover, and instead trigger it manually.
 
 ## Installation
 
@@ -123,26 +123,23 @@ And the previous day might look like
 Use this when you are developing locally or installing from a Git clone instead of the Community Plugins browser.
 
 1. **Clone or download** this repo and open a terminal in the project root.
-
 2. **Install dependencies and build** the bundled plugin entrypoint:
 
-   ```bash
-   npm install
-   npm run build
-   ```
+```bash
+ npm install
+ npm run build
+```
 
-   This generates **`main.js`** in the project root (alongside `manifest.json`).
+This generates `**main.js**` in the project root (alongside `manifest.json`). 3. **Copy the plugin into your vault.** Obsidian loads plugins from the hidden `.obsidian` folder inside each vault. Create a folder named after the plugin id (see `manifest.json`, `"id": "rollover-daily-todos-with-context"`):
 
-3. **Copy the plugin into your vault.** Obsidian loads plugins from the hidden `.obsidian` folder inside each vault. Create a folder named after the plugin id (see `manifest.json`, `"id": "obsidian-rollover-daily-todos"`):
+```text
+ <YourVault>/.obsidian/plugins/rollover-daily-todos-with-context/
+```
 
-   ```text
-   <YourVault>/.obsidian/plugins/obsidian-rollover-daily-todos/
-   ```
+Copy at least these files into that folder:
 
-   Copy at least these files into that folder:
-
-   - `manifest.json`
-   - `main.js`
+- `manifest.json`
+- `main.js`
 
 4. **Enable the plugin** in Obsidian: **Settings → Community plugins** → turn off Restricted mode if prompted → find **Rollover Daily Todos** and enable it. Restart Obsidian if it does not appear.
 
