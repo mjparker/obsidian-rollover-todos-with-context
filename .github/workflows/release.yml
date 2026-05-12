@@ -7,6 +7,9 @@ on:
 
 permissions:
   contents: write
+  id-token: write
+  attestations: write
+  artifact-metadata: write
 
 jobs:
   release:
@@ -48,6 +51,13 @@ jobs:
             echo "Build did not produce main.js."
             exit 1
           fi
+
+      - name: Generate artifact attestations
+        uses: actions/attest@v4
+        with:
+          subject-path: |
+            main.js
+            manifest.json
 
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2

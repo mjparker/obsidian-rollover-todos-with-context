@@ -53,6 +53,15 @@ gh release view 1.0.1 \
 
 You should see `main.js` and `manifest.json` listed as individual assets.
 
+The release workflow also generates GitHub artifact attestations for those files. To verify a downloaded asset locally:
+
+```bash
+gh attestation verify main.js \
+  --repo mjparker/obsidian-rollover-todos-with-context
+```
+
+Attestations are created when a release is built by GitHub Actions. Releases uploaded manually without the workflow will not satisfy that check until you publish a new tag-built release.
+
 ## Manual release (fallback)
 
 Use this if the workflow fails or you need to repair an existing release.
