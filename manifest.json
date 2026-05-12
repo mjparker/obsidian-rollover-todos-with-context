@@ -1,7 +1,7 @@
 {
   "id": "rollover-daily-todos-with-context",
   "name": "Rollover Daily Todos with Context",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "minAppVersion": "0.12.12",
   "description": "Rollover any unchecked checkboxes from your last daily note into today's note, with context.",
   "author": "Michael Parker",
