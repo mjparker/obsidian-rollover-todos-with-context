@@ -1,0 +1,58 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 6.0.2
+          run_install: true
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Build plugin
+        run: pnpm build
+
+      - name: Validate tag and manifest version
+        run: |
+          if [[ "${GITHUB_REF_NAME}" == v* ]]; then
+            echo "Release tags must not start with 'v'."
+            exit 1
+          fi
+
+          manifest_version="$(node -p "require('./manifest.json').version")"
+          if [ "${GITHUB_REF_NAME}" != "${manifest_version}" ]; then
+            echo "Tag ${GITHUB_REF_NAME} does not match manifest.json version ${manifest_version}."
+            exit 1
+          fi
+
+          if [ ! -f main.js ]; then
+            echo "Build did not produce main.js."
+            exit 1
+          fi
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            main.js
+            manifest.json
+          generate_release_notes: true

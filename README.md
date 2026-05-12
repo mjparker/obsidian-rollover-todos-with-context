@@ -149,6 +149,10 @@ Copy at least these files into that folder:
 
 You can also install released versions from Obsidian’s **Community Plugins** tab when this plugin is listed there (search for **Rollover Daily Todos**).
 
+## Releasing
+
+Maintainers should follow [RELEASING.md](RELEASING.md) when cutting a new version.
+
 ## Attribution
 
 This plugin is maintained by Michael Parker. It extends [Rollover Daily Todos](https://github.com/lumoe/obsidian-rollover-daily-todos) by Lukas Mölschl, which built on the original rollover-daily-todos idea by Matthew Sessions.
